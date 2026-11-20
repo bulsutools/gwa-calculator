@@ -1,0 +1,4 @@
+{
+  "name": "gwa-calculator",
+  "extends": "https://github.com/bulsutools/devcontainer"
+}
