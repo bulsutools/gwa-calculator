@@ -1,29 +1,69 @@
 name: CI
 
 on:
-  workflow_call:
-  workflow_dispatch:
+  pull_request:
+    paths-ignore:
+      - "**.md"
+      - "docs/**"
+  push:
+    branches:
+      - main
+    paths-ignore:
+      - "**.md"
+      - "docs/**"
 
-permissions:
-  contents: read
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
-  checks:
+  verify:
+    name: Verify (lint, syntax)
     runs-on: ubuntu-latest
-    timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
+          cache: pnpm
+
       - name: Install dependencies
-        run: |
-          if [ -f package-lock.json ]; then npm ci; else npm install --no-audit --no-fund; fi
-      - name: Install Chromium for tests
-        run: npx playwright install --with-deps chromium
+        run: pnpm install --frozen-lockfile
+
       - name: Lint HTML
-        run: npm run lint:html
+        run: pnpm run lint:html
+
       - name: Check inline JavaScript syntax
-        run: npm run check:js
+        run: pnpm run check:js
+
+  e2e:
+    name: Browser smoke tests
+    needs: verify
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Chromium for tests
+        run: pnpm exec playwright install --with-deps chromium
+
       - name: Browser smoke tests
-        run: npm test
+        run: pnpm test
