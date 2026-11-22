@@ -81,7 +81,84 @@ async function fillRows(page, id, rows, sem = false) {
   await ctx.close();
 }
 
-// 7. No horizontal overflow at key widths
+// 7. Term planner: projected GWA, unit warning, honors ceiling, trajectory
+{
+  const { ctx, page, errors } = await freshPage();
+  await accept(page);
+  // Same rows as the GWA example: 17.25/12 = 1.4375 -> 1.44, but only 12 units
+  await fillRows(page, 'planRows', [[3, '1.25'], [3, '1.50'], [3, '1.75'], [3, '1.25']]);
+  await page.selectOption('#pTerms', '3');
+  await page.click('#planCalc');
+  const out = await page.innerText('#planOut');
+  ok(out.includes('1.44'), 'planner shows projected term GWA 1.44');
+  ok(out.includes('12'), 'planner shows 12 planned units');
+  ok(out.includes('below 15'), 'planner warns about a sub-15-unit term load');
+  ok(out.includes("President's List / Summa Cum Laude grade limits"), 'planner reports the grade-limit ceiling');
+  ok((await page.$$eval('#planOut tbody tr', r => r.length)) === 3, 'trajectory table has one row per projected term');
+  ok(out.includes('Magna Cum Laude'), 'trajectory projects Magna Cum Laude for GWA 1.4375');
+
+  // Individual-grade caps: a planned 2.50 blocks President's/Summa and Magna
+  await page.click('[data-clear=planner]');
+  await fillRows(page, 'planRows', [[3, '2.50']]);
+  await page.click('#planCalc');
+  const out2 = await page.innerText('#planOut');
+  ok(out2.includes('individual-grade limit'), 'planner warns on individual-grade caps');
+  ok(out2.includes("President's List / Summa Cum Laude"), 'planner names the honors blocked by the grade');
+  ok(out2.includes('Cum Laude grade limit'), 'planner caps achievable honors at Cum Laude');
+
+  // Cumulative trajectory: 60 units @1.70, lowest grade 2.00, 15u @1.00 per term
+  // term GWA 1.00; cumulative GWA falls to 1.35 after 4 terms -> Magna Cum Laude
+  await page.click('[data-clear=planner]');
+  await fillRows(page, 'planRows', [[3,'1.00'],[3,'1.00'],[3,'1.00'],[3,'1.00'],[3,'1.00']]);
+  await page.selectOption('#pTerms', '4');
+  await page.fill('#pCumGwa', '1.70');
+  await page.fill('#pCumUnits', '60');
+  await page.fill('#pCumMin', '2.00');
+  await page.click('#planCalc');
+  const out3 = await page.innerText('#planOut');
+  ok(out3.includes('1.35'), 'trajectory shows projected cumulative GWA 1.35 after 4 terms');
+  ok(out3.includes('Magna Cum Laude'), 'cumulative trajectory reaches Magna Cum Laude');
+  ok((await page.$$eval('#planOut tbody tr', r => r.length)) === 5, 'trajectory includes baseline plus 4 term rows');
+
+  ok(errors.length === 0, `no console/page errors${errors.length ? ': ' + errors.join(' | ') : ''}`);
+  await ctx.close();
+}
+
+// 8. Planner share link round-trips plan state through the URL, no backend
+{
+  const ctx = await browser.newContext({ viewport: { width: 390, height: 800 }, permissions: ['clipboard-read', 'clipboard-write'] });
+  const page = await ctx.newPage();
+  const errors = [];
+  page.on('pageerror', e => errors.push(e.message));
+  page.on('console', m => { if (m.type() === 'error') errors.push(m.text()); });
+  await page.goto(URL_);
+  await accept(page);
+  await fillRows(page, 'planRows', [[3, '1.25'], [3, '1.50']]);
+  await page.fill('#pSched', 'MWF mornings');
+  await page.click('#planCalc');
+  await page.click('#planShare');
+  let share = '';
+  try { share = await page.evaluate(() => navigator.clipboard.readText()); } catch (e) { /* fall through to DOM fallback */ }
+  if (!share) share = await page.$eval('#planOut input[readonly]', e => e.value).catch(() => '');
+  ok(share.includes('#plan='), 'share link contains an encoded plan payload');
+
+  // Fresh context: only the URL can populate the planner (no localStorage)
+  const ctx2 = await browser.newContext({ viewport: { width: 390, height: 800 } });
+  const page2 = await ctx2.newPage();
+  const errors2 = [];
+  page2.on('pageerror', e => errors2.push(e.message));
+  await page2.goto(share);
+  await accept(page2);
+  const out2 = await page2.innerText('#planOut');
+  ok(out2.includes('Projected term GWA'), 'shared link reproduces the projection');
+  ok((await page2.$$eval('#planRows .subj', e => e.length)) === 2, 'shared link restores both planned subjects');
+  ok((await page2.inputValue('#pSched')) === 'MWF mornings', 'shared link restores schedule constraints');
+  ok(errors.length === 0 && errors2.length === 0, `no console/page errors on share round-trip${[...errors, ...errors2].length ? ': ' + [...errors, ...errors2].join(' | ') : ''}`);
+  await ctx.close();
+  await ctx2.close();
+}
+
+// 9. No horizontal overflow at key widths
 for (const w of [360, 390, 768, 1024, 1280, 1920]) {
   const { ctx, page } = await freshPage(w, 900);
   await accept(page);
