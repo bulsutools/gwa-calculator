@@ -274,6 +274,17 @@ footer .links{display:flex;flex-wrap:wrap;gap:.4rem 1.2rem;margin:.6rem 0}
   <label style="max-width:360px">Choose your target<select id="tSel"><option value="">Select a target</option><option value="pres">President's List</option><option value="dean">Dean's List</option><option value="summa">Summa Cum Laude</option><option value="magna">Magna Cum Laude</option><option value="cum">Cum Laude</option></select></label>
   <div id="tOut" style="margin-top:.8rem"></div>
  </div>
+
+ <div class="card" id="coach" style="margin-top:1.3rem;scroll-margin-top:80px">
+  <h3>Academic Coach <span class="muted" style="font-weight:500;font-size:.85rem">(estimate — verify with the university)</span></h3>
+  <p class="muted" style="font-size:.9rem">A plain-language read of your entered records: which subjects pull your GWA up or down, and where your GWA lands if your remaining subjects go a certain way. Everything uses the same formulas as the calculators above; nothing is uploaded.</p>
+  <div class="fgrid">
+   <label>Units still to complete<input id="wUnits" type="number" inputmode="decimal" min="0" step="any" placeholder="e.g. 18"></label>
+   <label>Expected grade in those units<select id="wGrade"><option value="">Select grade</option><option value="1.00">1.00</option><option value="1.25">1.25</option><option value="1.50">1.50</option><option value="1.75">1.75</option><option value="2.00">2.00</option><option value="2.25">2.25</option><option value="2.50">2.50</option><option value="2.75">2.75</option><option value="3.00">3.00</option><option value="4.00">4.00</option><option value="5.00">5.00</option></select></label>
+   <label>Target honor<select id="wTarget"><option value="">Select a target</option><option value="pres">President's List</option><option value="dean">Dean's List</option><option value="summa">Summa Cum Laude</option><option value="magna">Magna Cum Laude</option><option value="cum">Cum Laude</option></select></label>
+  </div>
+  <div id="coachOut" aria-live="polite"></div>
+ </div>
 </div></section>
 
 <!-- GRADES -->
@@ -553,6 +564,59 @@ function runLatin(){
  updateAll();
 }
 
+/* ---------- Coach ---------- */
+const WIF=[{k:'pres',name:"President's List",lo:1,hi:1.2},{k:'dean',name:"Dean's List",lo:1.21,hi:1.75},{k:'summa',name:'Summa Cum Laude',lo:1,hi:1.2},{k:'magna',name:'Magna Cum Laude',lo:1,hi:1.45},{k:'cum',name:'Cum Laude',lo:1,hi:1.75}];
+function coachSrc(){
+ if(state.gwa)return{label:'GWA Calculator',recs:state.gwa.recs,s:state.gwa.s,sems:null};
+ if(state.latin){const by={};state.latin.recs.forEach(r=>{(by[r.sem]=by[r.sem]||[]).push(r);});
+  return{label:'Latin Honors (cumulative)',recs:state.latin.recs,s:state.latin.s,sems:Object.keys(by).map(k=>[k,stats(by[k])])};}
+ if(state.gold){const recs=state.gold.A.concat(state.gold.B);
+  return{label:'Gold Gear Awards (both semesters combined)',recs,s:stats(recs),sems:[['Previous 2nd Semester',state.gold.sA],['Current 1st Semester',state.gold.sB]]};}
+ return null;
+}
+const coachName=r=>esc([r.code,r.desc].filter(Boolean).join(' – ')||('Subject '+r.n))+(r.sem?' · '+esc(r.sem):'');
+function renderCoach(){
+ const out=$('coachOut'),src=coachSrc();
+ if(!src){out.innerHTML=chip('na','Not Yet Assessed')+'<p class="muted">Enter and calculate your records in any calculator above; the coach reads the same results.</p>';return;}
+ const s=src.s,g=s.gwa,h=[];
+ /* per-course drag */
+ const num=src.recs.filter(r=>!SPECIAL.includes(r.grade));
+ num.forEach(r=>{r._dev=parseFloat(r.grade)-g;r._imp=Math.abs(r._dev)*r.units;});
+ const worse=num.filter(r=>r._dev>1e-9).sort((a,b)=>b._imp-a._imp).slice(0,4);
+ const better=num.filter(r=>r._dev<-1e-9).sort((a,b)=>b._imp-a._imp).slice(0,4);
+ const dragTbl=rows=>`<div class="tablewrap"><table><thead><tr><th>Subject</th><th>Units</th><th>Grade</th><th>Grade − GWA</th></tr></thead><tbody>${rows.map(r=>`<tr><td>${coachName(r)}</td><td>${fu(r.units)}</td><td>${gl(r.grade)}</td><td>${r._dev>0?'+':''}${r._dev.toFixed(2)}</td></tr>`).join('')}</tbody></table></div>`;
+ h.push('<div class="sub-h">What is pulling your GWA</div>');
+ h.push(`<p class="muted" style="font-size:.9rem">Your GWA is ${r2(g)}. A positive "Grade − GWA" is numerically higher (weaker) than your average and pulls the GWA up; negative pulls it down. Impact grows with units.</p>`);
+ if(worse.length)h.push('<p><b>Pulling it up (weaker than average):</b></p>'+dragTbl(worse));
+ if(better.length)h.push('<p><b>Pulling it down (stronger than average):</b></p>'+dragTbl(better));
+ if(!worse.length&&!better.length)h.push('<p class="muted">Every graded subject sits exactly at your GWA.</p>');
+ /* per-semester drag */
+ if(src.sems&&src.sems.length>1){
+  const graded=src.sems.filter(x=>x[1].gwa!=null);
+  h.push('<div class="sub-h">By semester</div><div class="tablewrap"><table><thead><tr><th>Semester</th><th>GWA</th><th>Units</th><th>GWA − combined</th></tr></thead><tbody>'+
+   src.sems.map(([n,ss])=>`<tr><td>${esc(n)}</td><td>${ss.gwa==null?'—':r2(ss.gwa)}</td><td>${fu(ss.totalUnits)}</td><td>${ss.gwa==null?'—':(ss.gwa-g>0?'+':'')+(ss.gwa-g).toFixed(2)}</td></tr>`).join('')+'</tbody></table></div>');
+  if(graded.length>1){const weak=graded.reduce((a,b)=>b[1].gwa>a[1].gwa?b:a);
+   h.push(`<p class="muted" style="font-size:.9rem">${esc(weak[0])} is the weaker reading (GWA ${r2(weak[1].gwa)}); the combined GWA is pulled toward it in proportion to its ${fu(weak[1].totalUnits)} units.</p>`);}
+ }
+ /* formula explainer */
+ h.push(`<div class="note info"><b>How the math works.</b> GWA = Σ(grade × units) ÷ Σ(units). Every subject is weighted by its units, so a 3-unit subject counts three times as much as a 1-unit subject at the same grade. Your ${esc(src.label)} entries: weighted total ${r2(s.weighted)} over ${fu(s.totalUnits)} units gives ${r2(g)}.`+
+  (src.label.indexOf('Gold Gear')===0?' For Gold Gear, the combined GWA pools both semesters the same way: (sem 1 GWA × units 1 + sem 2 GWA × units 2) ÷ (units 1 + units 2) equals the GWA of all subjects together.':'')+'</div>');
+ /* what-if */
+ h.push('<div class="sub-h">What-if projection</div>');
+ const wu=Number($('wUnits').value),wg=$('wGrade').value?parseFloat($('wGrade').value):NaN,wk=$('wTarget').value;
+ if(!(wu>0)||!isFinite(wg)){h.push('<p class="muted">Enter the units still to complete and an expected grade to project where your GWA lands.</p>');}
+ else{
+  const proj=(s.weighted+wg*wu)/(s.totalUnits+wu);
+  h.push(`<div class="stats">${tile(r2(proj),'Projected GWA ('+r4(proj)+')')}${tile(r2(g),'Current GWA')}${tile((proj-g>0?'+':'')+(proj-g).toFixed(2),'Change (lower is better)')}</div>`);
+  h.push(WIF.map(t=>{const now=inR(g,t.lo,t.hi),pr=inR(proj,t.lo,t.hi);
+   return `<div class="status ${pr?'ok':'na'}" style="padding:.6rem .9rem;margin:.5rem 0"><b>${t.name}</b> ${chip(pr?'ok':'na',pr?'Projected GWA in range':'Projected GWA outside range')}<span class="muted"> now: ${now?'in':'out'} of range</span><p class="muted" style="margin:.2rem 0 0">GWA range ${t.lo.toFixed(2)}–${t.hi.toFixed(2)}. Range check only; individual-grade limits and other requirements are assessed in the honor checkers.</p></div>`;}).join(''));
+  if(wk&&TG[wk]){const t=TG[wk];
+   const needHi=(t.hi*(s.totalUnits+wu)-s.weighted)/wu,needLo=(t.lo*(s.totalUnits+wu)-s.weighted)/wu;
+   h.push(`<div class="note info">To land inside the ${t.name} GWA range (${t.lo.toFixed(2)}–${t.hi.toFixed(2)}), your average grade across the ${fu(wu)} remaining units must be between ${needLo.toFixed(2)} and ${needHi.toFixed(2)} (lower is better)${needHi<1?' — not reachable, since 1.00 is the best grade':''}. This covers the GWA check only.</div>`);}
+ }
+ out.innerHTML=h.join('');
+}
+
 /* ---------- Dashboard ---------- */
 function renderDash(){
  const g=state.gwa,gd=state.gold,l=state.latin,na=chip('na','Not Yet Assessed');
@@ -595,7 +659,7 @@ function renderTarget(){
  out.innerHTML=`<div class="stats">${tile(src.map(x=>r2(x[1].gwa)).join(' / '),'Current GWA')}${tile(rng,'Target GWA range')}${tile('≤ '+t.cap.toFixed(2),'Lowest-grade requirement')}</div>
  <div class="status ${lvl}">${chip(lvl,lvl==='ok'?'Currently aligned with target':lvl==='bad'?'Not currently aligned':'Alignment needs verification')}<p>Target: ${t.name}. This is a status check on entered data only, not a prediction or guarantee.</p></div>${list(items)}${note?`<div class="note info">${esc(note)}</div>`:''}`;
 }
-function updateAll(){renderDash();renderTarget();}
+function updateAll(){renderDash();renderTarget();renderCoach();}
 
 /* ---------- Print ---------- */
 function buildPrint(){
@@ -639,6 +703,7 @@ $('btnReset').onclick=()=>{if(confirm('Clear all entered records, results, and t
 $('btnPrint').onclick=()=>{buildPrint();window.print();};
 window.addEventListener('beforeprint',buildPrint);
 $('tSel').onchange=renderTarget;
+['wUnits','wGrade','wTarget'].forEach(id=>$(id).addEventListener('input',renderCoach));
 
 /* nav */
 const nav=$('nav'),burger=$('burger');
