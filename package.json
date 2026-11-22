@@ -3,11 +3,14 @@
   "version": "1.0.0",
   "private": true,
   "type": "module",
-  "description": "BulSU GWA Calculator & Academic Honors Eligibility Checker (static site, no backend)",
+  "description": "BulSU GWA Calculator & Academic Honors Eligibility Checker (static site + Cloudflare Worker API/MCP)",
   "scripts": {
+    "start": "node scripts/serve.mjs",
     "lint:html": "html-validate index.html",
     "check:js": "node scripts/check-js.mjs",
     "test": "node tests/smoke.mjs",
+    "test:api": "node --test tests/api.test.mjs",
+    "test:parity": "node tests/parity.mjs",
     "check": "npm run lint:html && npm run check:js && npm run test",
     "build": "node scripts/build.mjs"
   },
