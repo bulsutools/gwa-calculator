@@ -22,7 +22,7 @@ Original author: Rey Miguel S. Querol (BulSU Bustos Campus). Maintained by the `
 | `worker/mcp.mjs` | MCP server (Streamable HTTP, JSON-RPC): `compute_gwa` + `check_honors` tools |
 | `worker/wrangler.jsonc` | Worker deploy config (`bulsu-gwa-api` on workers.dev) |
 | `scripts/serve.mjs` | Local static server (`npm start`); also used by the tests |
-| `tests/smoke.mjs` | Playwright browser smoke tests (calculations, persistence, dark mode, no overflow) |
+| `tests/smoke.mjs` | Playwright browser smoke tests (calculations, term planner, share links, persistence, dark mode, no overflow) |
 | `tests/api.test.mjs` | Worker API + MCP unit tests (`node --test`) |
 | `tests/parity.mjs` | Playwright parity test: API results vs. the live site calculator |
 | `scripts/check-js.mjs` | Syntax check for inline scripts and ES modules |

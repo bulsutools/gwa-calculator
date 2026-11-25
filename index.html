@@ -179,7 +179,7 @@ footer .links{display:flex;flex-wrap:wrap;gap:.4rem 1.2rem;margin:.6rem 0}
   <button type="button" id="themeBtn" aria-label="Switch to dark mode" aria-pressed="false" title="Toggle dark mode">🌙</button>
   <button type="button" id="burger" aria-label="Toggle menu" aria-expanded="false" aria-controls="nav"><i></i><i></i><i></i></button>
   <nav id="nav" aria-label="Main">
-   <a href="#home">Home</a><a href="#gwa">GWA Calculator</a><a href="#gold">Gold Gear Awards</a><a href="#latin">Latin Honors</a><a href="#grades">Grade Equivalency</a><a href="#references">References</a><a href="#about">About the Developer</a>
+   <a href="#home">Home</a><a href="#gwa">GWA Calculator</a><a href="#gold">Gold Gear Awards</a><a href="#latin">Latin Honors</a><a href="#planner">Term Planner</a><a href="#grades">Grade Equivalency</a><a href="#references">References</a><a href="#about">About the Developer</a>
   </nav>
  </div>
 </header>
@@ -196,6 +196,7 @@ footer .links{display:flex;flex-wrap:wrap;gap:.4rem 1.2rem;margin:.6rem 0}
    <a class="card qa" href="#gwa"><div class="ic" aria-hidden="true">🧮</div><h3>GWA Calculator</h3><p>Calculate your weighted average using your academic units and numerical grades.</p></a>
    <a class="card qa" href="#gold"><div class="ic" aria-hidden="true">🏅</div><h3>Gold Gear Awards</h3><p>Check your potential eligibility for the President's List and Dean's List.</p></a>
    <a class="card qa" href="#latin"><div class="ic" aria-hidden="true">🎓</div><h3>Latin Honors</h3><p>Monitor your potential eligibility for Summa Cum Laude, Magna Cum Laude, and Cum Laude.</p></a>
+   <a class="card qa" href="#planner"><div class="ic" aria-hidden="true">🗓️</div><h3>Term Planner</h3><p>Project a term's GWA and honors trajectory before you register, with plan warnings and a shareable link.</p></a>
   </div>
   <div class="note info" style="margin-top:1.2rem"><b>Results are estimates.</b> This tool runs entirely in your browser; nothing you enter is sent anywhere. Final qualification is determined only by the appropriate BulSU offices.</div>
  </div>
@@ -253,6 +254,31 @@ footer .links{display:flex;flex-wrap:wrap;gap:.4rem 1.2rem;margin:.6rem 0}
    <button type="button" class="btn btn-red" data-clear="latin">Clear All</button>
   </div>
   <div id="latOut" aria-live="polite"></div>
+ </div>
+</div></section>
+
+<!-- PLANNER -->
+<section id="planner" class="sec"><div class="wrap">
+ <h2>Term Planner</h2>
+ <p class="muted">Plan a term before you register. Enter the subjects you intend to take with expected grades, choose how many terms to project, and optionally your cumulative record so far. The planner computes the projected term GWA, a cumulative honors trajectory, and warnings such as individual-grade caps and the 15-unit minimum. Schedule constraints are notes for you and anyone you share the plan with; this tool does not check real course offerings or room schedules.</p>
+ <div class="card">
+  <div id="planRows" class="subj-list"></div>
+  <div class="fgrid">
+   <label>Terms to project<select id="pTerms"><option value="1">1</option><option value="2">2</option><option value="3" selected>3</option><option value="4">4</option><option value="5">5</option><option value="6">6</option><option value="7">7</option><option value="8">8</option></select></label>
+   <label>Cumulative GWA so far (optional)<input id="pCumGwa" type="text" inputmode="decimal" maxlength="6" placeholder="e.g. 1.65" autocomplete="off"></label>
+   <label>Cumulative units so far (optional)<input id="pCumUnits" type="text" inputmode="decimal" maxlength="6" placeholder="e.g. 63" autocomplete="off"></label>
+   <label>Lowest grade so far (optional)<input id="pCumMin" type="text" inputmode="decimal" maxlength="6" placeholder="e.g. 2.25" autocomplete="off"></label>
+   <label>Preferred schedule constraints (optional)<input id="pSched" type="text" maxlength="120" placeholder="e.g. MWF mornings, no Friday classes" autocomplete="off"></label>
+  </div>
+  <p class="muted" style="font-size:.9rem">If you leave the cumulative fields empty, the trajectory assumes this same term load repeats every term starting from zero. If you enter a cumulative GWA, also enter the cumulative units and lowest grade so far.</p>
+  <div class="actions sticky">
+   <button type="button" class="btn btn-ghost" data-add="planRows">+ Add Subject</button>
+   <button type="button" class="btn btn-ghost" data-rem="planRows">− Remove Subject</button>
+   <button type="button" class="btn btn-gold" id="planCalc">Project Term</button>
+   <button type="button" class="btn btn-ghost" id="planShare">Copy Share Link</button>
+   <button type="button" class="btn btn-red" data-clear="planner">Clear All</button>
+  </div>
+  <div id="planOut" aria-live="polite"></div>
  </div>
 </div></section>
 
@@ -333,7 +359,7 @@ footer .links{display:flex;flex-wrap:wrap;gap:.4rem 1.2rem;margin:.6rem 0}
 
 <footer><div class="wrap">
  <b>BulSU GWA Calculator &amp; Academic Honors Eligibility Checker</b>
- <div class="links"><a href="#home">Home</a><a href="#gwa">GWA Calculator</a><a href="#gold">Gold Gear Awards</a><a href="#latin">Latin Honors</a><a href="#grades">Grade Equivalency</a><a href="#references">References</a><a href="#about">About</a><a href="#" id="showDisc">View Disclaimer</a></div>
+ <div class="links"><a href="#home">Home</a><a href="#gwa">GWA Calculator</a><a href="#gold">Gold Gear Awards</a><a href="#latin">Latin Honors</a><a href="#planner">Term Planner</a><a href="#grades">Grade Equivalency</a><a href="#references">References</a><a href="#about">About</a><a href="#" id="showDisc">View Disclaimer</a></div>
  <div>Results are estimates, not official evaluations. All computation happens in your browser.</div>
 </div></footer>
 

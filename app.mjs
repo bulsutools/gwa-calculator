@@ -12,7 +12,7 @@ import {
 const $=id=>document.getElementById(id);
 const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const KEY='bulsuGWA_v1';
-const state={gwa:null,gold:null,latin:null};
+const state={gwa:null,gold:null,latin:null,plan:null};
 const chip=(l,t)=>`<span class="chip ${l}">${esc(t)}</span>`;
 
 /* ---------- rows ---------- */
@@ -135,6 +135,100 @@ function runLatin(){
  updateAll();
 }
 
+/* ---------- Term Planner ---------- */
+const PLAN_FIELDS=['pCumGwa','pCumUnits','pCumMin'];
+const b64e=o=>btoa(String.fromCharCode(...new TextEncoder().encode(JSON.stringify(o)))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
+const b64d=s=>{s=s.replace(/-/g,'+').replace(/_/g,'/');while(s.length%4)s+='=';return JSON.parse(new TextDecoder().decode(Uint8Array.from(atob(s),c=>c.charCodeAt(0))));};
+const subjLbl=r=>[r.code,r.desc].filter(Boolean).join(' – ')||('Subject '+r.n);
+function planNums(){
+ const o={};
+ PLAN_FIELDS.forEach(id=>{const raw=$(id).value.trim();
+  if(raw===''){o[id]=null;return;}
+  const v=Number(raw);
+  o[id]=(!isFinite(v)||v<=0)?'bad':(id!=='pCumUnits'&&v>5)?'range':v;});
+ return o;
+}
+function runPlan(){
+ const R=readRows('planRows',false),out=$('planOut'),errs=[];
+ const nums=planNums(),t=parseInt($('pTerms').value,10),sched=$('pSched').value.trim();
+ if(!R.count)errs.push('Add at least one planned subject.');
+ errs.push(...R.errors);
+ if(!t||t<1||t>8)errs.push('Choose how many terms to project.');
+ PLAN_FIELDS.forEach(id=>{const lb=({pCumGwa:'Cumulative GWA',pCumUnits:'Cumulative units',pCumMin:'Lowest grade so far'})[id];
+  if(nums[id]==='bad')errs.push(lb+' must be a positive number.');
+  if(nums[id]==='range')errs.push(lb+' must be 5.00 or less.');});
+ if((nums.pCumGwa===null)!==(nums.pCumUnits===null))errs.push('Enter both cumulative GWA and cumulative units, or leave both empty.');
+ if(errs.length){out.innerHTML=errBox(errs);state.plan=null;return;}
+ const s=stats(R.recs);
+ if(!s.graded){out.innerHTML=errBox(['No numerically graded subject was planned, so a GWA cannot be projected.'],'Insufficient Information')+warnBox(s);state.plan=null;return;}
+ const warns=[];
+ if(s.totalUnits<15-1e-9)warns.push(`This term loads ${fu(s.totalUnits)} units. Gold Gear Awards and Latin Honors evaluations assume at least 15 units per term; verify exemptions with the registrar.`);
+ if(s.flags.f5)warns.push('A failing grade (5.00) is planned; honors eligibility is not expected on these grades.');
+ [['President\'s List / Summa Cum Laude',2.00],['Magna Cum Laude',2.25],['Cum Laude',2.50]].forEach(([nm,cap])=>{
+  const bad=R.recs.filter(r=>!SPECIAL.includes(r.grade)&&parseFloat(r.grade)>cap+1e-12);
+  if(bad.length)warns.push(`${bad.map(r=>`${subjLbl(r)} (${fu(r.units)} units at ${r.grade})`).join(', ')} exceed the ${cap.toFixed(2)} individual-grade limit for ${nm}.`);});
+ if((s.gwa>1.2&&s.gwa<1.21)||(s.gwa>1.45&&s.gwa<1.46))warns.push(`Projected term GWA ${r4(s.gwa)} falls between published honor GWA ranges; verification needed.`);
+ else if(s.gwa>1.75+1e-12)warns.push(`Projected term GWA ${r2(s.gwa)} is outside the Gold Gear GWA range (1.00-1.75).`);
+ let best;
+ if(s.flags.f5)best={l:'bad',t:'No honors expected (5.00 planned)'};
+ else if(s.maxRegular<=2+1e-12)best={l:'ok',t:"President's List / Summa Cum Laude grade limits"};
+ else if(s.maxRegular<=2.25+1e-12)best={l:'ok',t:'Magna Cum Laude grade limit'};
+ else if(s.maxRegular<=2.5+1e-12)best={l:'warn',t:'Cum Laude grade limit'};
+ else best={l:'bad',t:'No Latin Honors or Gold Gear on planned grades'};
+ if(s.totalUnits<15-1e-9)best.t+=', but units are below 15';
+ const hasCum=nums.pCumGwa!==null;
+ const cumU0=hasCum?nums.pCumUnits:0,cumW0=hasCum?nums.pCumGwa*nums.pCumUnits:0;
+ const latAt=(g,u,mr)=>{const fake={gwa:g,totalUnits:u,weighted:g*u,maxRegular:mr,flags:s.flags,graded:1,count:1,min:null};
+  const hit=assessLatin(fake).find(c=>c.level==='ok'||c.level==='warn');
+  return hit?hit.name:'None on entered grades';};
+ let traj='';
+ if(hasCum){
+  const mr0=nums.pCumMin!==null?nums.pCumMin:s.maxRegular;
+  traj+=`<tr><td>Now (cumulative)</td><td>${fu(cumU0)}</td><td>${r2(nums.pCumGwa)} (${r4(nums.pCumGwa)})</td><td>${esc(latAt(nums.pCumGwa,cumU0,mr0))}</td></tr>`;
+ }
+ for(let k=1;k<=t;k++){
+  const u=cumU0+s.totalUnits*k,w=cumW0+s.weighted*k,g=w/u;
+  const mr=Math.max(hasCum&&nums.pCumMin!==null?nums.pCumMin:0,s.maxRegular);
+  traj+=`<tr><td>After term ${k}</td><td>${fu(u)}</td><td>${r2(g)} (${r4(g)})</td><td>${esc(latAt(g,u,mr))}</td></tr>`;
+ }
+ state.plan={recs:R.recs,s,nums,t,sched};
+ out.innerHTML=`<h3 style="margin-top:1rem">Projected Term</h3>
+ <div class="stats">${tile(r2(s.gwa),'Projected term GWA ('+r4(s.gwa)+')')}${tile(fu(s.totalUnits),'Planned units')}${tile(s.count,'Planned subjects')}${tile(r2(s.weighted),'Weighted total')}</div>
+ <div class="status ${best.l}">${chip(best.l,best.t)}<p>Grade-limit ceiling for this term only. Actual honors also depend on your cumulative GWA, units, enrollment and official verification.</p></div>
+ ${warns.length?`<div class="note warn"><b>Plan warnings</b><ul>${warns.map(x=>`<li>${esc(x)}</li>`).join('')}</ul></div>`:''}
+ ${warnBox(s)}
+ ${sched?`<div class="note info"><b>Preferred schedule constraints:</b> ${esc(sched)}</div>`:''}
+ <div class="sub-h">Honors trajectory (projected cumulative GWA)</div>
+ <div class="tablewrap"><table><thead><tr><th>Point</th><th>Cumulative units</th><th>Cumulative GWA</th><th>Projected Latin honor</th></tr></thead><tbody>${traj}</tbody></table></div>
+ <div class="note info">${hasCum?'Trajectory adds this term\'s load each term on top of your entered cumulative record.':'Trajectory assumes this same term load repeats every term starting from zero.'} The Latin honor column reuses the cumulative GWA bands and individual-grade limits; special-grade history and other graduation requirements are not modeled. All figures are estimates; verify with the registrar.</div>`;
+}
+$('planCalc').onclick=runPlan;
+$('planShare').onclick=async()=>{
+ const p=state.plan,btn=$('planShare');
+ if(!p){btn.textContent='Project the term first';setTimeout(()=>{btn.textContent='Copy Share Link';},1800);return;}
+ const pay={v:1,r:p.recs.map(r=>({c:r.code,d:r.desc,u:r.units,g:r.grade})),t:p.t,cg:p.nums.pCumGwa,cu:p.nums.pCumUnits,cm:p.nums.pCumMin,sc:p.sched};
+ const url=location.href.split('#')[0]+'#plan='+b64e(pay);
+ try{await navigator.clipboard.writeText(url);btn.textContent='Link copied';}
+ catch(e){$('planOut').insertAdjacentHTML('beforeend',`<div class="note info"><b>Share link</b> (copy manually, it stays in this browser's address bar only):<br><input readonly value="${esc(url)}" onclick="this.select()"></div>`);}
+ setTimeout(()=>{btn.textContent='Copy Share Link';},1800);
+};
+function applyPlanHash(){
+ let m;try{m=(location.hash||'').match(/[#&]plan=([A-Za-z0-9_-]+)/);}catch(e){return;}
+ if(!m)return;
+ let p;try{p=b64d(m[1]);}catch(e){return;}
+ if(!p||!Array.isArray(p.r))return;
+ $('planRows').innerHTML='';
+ p.r.slice(0,200).forEach(x=>{addRow('planRows');const r=$('planRows').lastElementChild;
+  const set=(sel,v)=>{const el=r.querySelector(sel);if(el&&v!=null)el.value=String(v);};
+  set('.i-code',x.c);set('.i-desc',x.d);set('.i-units',x.u);set('.i-grade',x.g);});
+ if(!document.querySelector('#planRows .subj'))addRow('planRows');
+ if(p.t)$('pTerms').value=String(Math.min(8,Math.max(1,parseInt(p.t,10)||3)));
+ [['pCumGwa',p.cg],['pCumUnits',p.cu],['pCumMin',p.cm]].forEach(([id,v])=>{if(v!=null)$(id).value=String(v);});
+ if(p.sc)$('pSched').value=String(p.sc);
+ runPlan();
+}
+
+
 /* ---------- Dashboard ---------- */
 function renderDash(){
  const g=state.gwa,gd=state.gold,l=state.latin,na=chip('na','Not Yet Assessed');
@@ -192,16 +286,18 @@ function buildPrint(){
 
 /* ---------- wiring ---------- */
 function reset(){
- ['gwaRows','g1','g2','lat'].forEach(id=>{$(id).innerHTML='';});
- addRow('gwaRows');addRow('g1');addRow('g2');addRow('lat',true);
- ['gwaOut','goldOut','latOut'].forEach(id=>{$(id).innerHTML='';});
- ['gYear','gEnr','gCur','tSel'].forEach(id=>{$(id).value='';});
- state.gwa=state.gold=state.latin=null;updateAll();
+ ['gwaRows','g1','g2','lat','planRows'].forEach(id=>{$(id).innerHTML='';});
+ addRow('gwaRows');addRow('g1');addRow('g2');addRow('lat',true);addRow('planRows');
+ ['gwaOut','goldOut','latOut','planOut'].forEach(id=>{$(id).innerHTML='';});
+ ['gYear','gEnr','gCur','tSel','pCumGwa','pCumUnits','pCumMin','pSched'].forEach(id=>{$(id).value='';});
+ $('pTerms').value='3';
+ state.gwa=state.gold=state.latin=state.plan=null;updateAll();
 }
 function clearOne(w){
  if(w==='gwa'){$('gwaRows').innerHTML='';addRow('gwaRows');$('gwaOut').innerHTML='';state.gwa=null;}
  if(w==='gold'){['g1','g2'].forEach(id=>{$(id).innerHTML='';addRow(id);});$('goldOut').innerHTML='';['gYear','gEnr','gCur'].forEach(id=>{$(id).value='';});state.gold=null;}
  if(w==='latin'){$('lat').innerHTML='';addRow('lat',true);$('latOut').innerHTML='';state.latin=null;}
+ if(w==='planner'){$('planRows').innerHTML='';addRow('planRows');$('planOut').innerHTML='';['pCumGwa','pCumUnits','pCumMin','pSched'].forEach(id=>{$(id).value='';});$('pTerms').value='3';state.plan=null;}
  updateAll();
 }
 document.addEventListener('click',e=>{
@@ -226,7 +322,7 @@ $('tSel').onchange=renderTarget;
 const nav=$('nav'),burger=$('burger');
 burger.onclick=()=>{const o=nav.classList.toggle('open');burger.setAttribute('aria-expanded',o);};
 nav.addEventListener('click',e=>{if(e.target.tagName==='A'){nav.classList.remove('open');burger.setAttribute('aria-expanded','false');}});
-const ids=['home','gwa','gold','latin','grades','references','about'];
+const ids=['home','gwa','gold','latin','planner','grades','references','about'];
 function spy(){let cur='home';const y=120;
  ids.forEach(id=>{const el=$(id);if(el&&el.getBoundingClientRect().top<=y)cur=id;});
  if(window.innerHeight+window.scrollY>=document.body.offsetHeight-4)cur='about';
@@ -251,7 +347,7 @@ applyTheme(root.getAttribute('data-theme')==='dark'?'dark':'light');
 /* ---------- auto-save / restore ---------- */
 function snapshot(){
  const rows=id=>[...document.querySelectorAll('#'+id+' .subj')].map(r=>({s:(r.querySelector('.i-sem')||{}).value||'',c:r.querySelector('.i-code').value,d:r.querySelector('.i-desc').value,u:r.querySelector('.i-units').value,g:r.querySelector('.i-grade').value}));
- return {v:1,rows:{gwaRows:rows('gwaRows'),g1:rows('g1'),g2:rows('g2'),lat:rows('lat')},f:{gYear:$('gYear').value,gEnr:$('gEnr').value,gCur:$('gCur').value,tSel:$('tSel').value},calc:{gwa:!!state.gwa,gold:!!state.gold,latin:!!state.latin}};
+ return {v:1,rows:{gwaRows:rows('gwaRows'),g1:rows('g1'),g2:rows('g2'),lat:rows('lat'),planRows:rows('planRows')},f:{gYear:$('gYear').value,gEnr:$('gEnr').value,gCur:$('gCur').value,tSel:$('tSel').value,pTerms:$('pTerms').value,pCumGwa:$('pCumGwa').value,pCumUnits:$('pCumUnits').value,pCumMin:$('pCumMin').value,pSched:$('pSched').value},calc:{gwa:!!state.gwa,gold:!!state.gold,latin:!!state.latin,plan:!!state.plan}};
 }
 function save(){try{localStorage.setItem(KEY,JSON.stringify(snapshot()));}catch(e){}}
 let saveT=null;function queueSave(){clearTimeout(saveT);saveT=setTimeout(save,250);}
@@ -259,7 +355,7 @@ function restore(){
  let d=null;try{d=JSON.parse(localStorage.getItem(KEY)||'null');}catch(e){}
  if(!d||typeof d!=='object'||!d.rows)return false;
  let any=false;
- ['gwaRows','g1','g2','lat'].forEach(id=>{
+ ['gwaRows','g1','g2','lat','planRows'].forEach(id=>{
   const arr=Array.isArray(d.rows[id])?d.rows[id]:[];
   $(id).innerHTML='';
   (arr.length?arr:[{}]).slice(0,200).forEach(x=>{
@@ -268,13 +364,14 @@ function restore(){
    set('.i-sem',x.s);set('.i-code',x.c);set('.i-desc',x.d);set('.i-units',x.u);set('.i-grade',x.g);
    const g=r.querySelector('.i-grade');if(g.value&&EQUIV[g.value])r.querySelector('.eq').textContent='Equivalent: '+EQUIV[g.value];
    if(x.s||x.c||x.d||x.u||x.g)any=true;});});
- if(d.f)['gYear','gEnr','gCur','tSel'].forEach(k=>{if(d.f[k]!=null)$(k).value=String(d.f[k]);});
- if(d.calc){if(d.calc.gwa)runGWA();if(d.calc.gold)runGold();if(d.calc.latin)runLatin();}
+ if(d.f)['gYear','gEnr','gCur','tSel','pTerms','pCumGwa','pCumUnits','pCumMin','pSched'].forEach(k=>{if(d.f[k]!=null)$(k).value=String(d.f[k]);});
+ if(d.calc){if(d.calc.gwa)runGWA();if(d.calc.gold)runGold();if(d.calc.latin)runLatin();if(d.calc.plan)runPlan();}
  updateAll();
  return any;
 }
 reset();
 if(restore())$('saveNote').textContent='Your previous entries were restored. They are saved automatically in this browser only and are never uploaded. “Reset Calculator” clears them.';
+applyPlanHash();
 ['input','change','click'].forEach(ev=>document.addEventListener(ev,queueSave));
 window.addEventListener('pagehide',save);
 document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden')save();});
