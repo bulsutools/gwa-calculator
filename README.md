@@ -15,7 +15,7 @@ Original author: Rey Miguel S. Querol (BulSU Bustos Campus). Maintained by the `
 | Path | Purpose |
 | --- | --- |
 | `index.html` | The whole site (HTML, CSS, JS in one file) |
-| `tests/smoke.mjs` | Playwright browser smoke tests (calculations, persistence, dark mode, no overflow) |
+| `tests/smoke.mjs` | Playwright browser smoke tests (calculations, term planner, share links, persistence, dark mode, no overflow) |
 | `scripts/check-js.mjs` | Syntax check for inline scripts |
 | `scripts/build.mjs` | Copies deployable files into `dist/` |
 | `.github/workflows/ci.yml` | Reusable CI: HTML lint, JS syntax check, smoke tests |
