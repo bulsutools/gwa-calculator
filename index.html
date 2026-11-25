@@ -300,6 +300,17 @@ footer .links{display:flex;flex-wrap:wrap;gap:.4rem 1.2rem;margin:.6rem 0}
   <label style="max-width:360px">Choose your target<select id="tSel"><option value="">Select a target</option><option value="pres">President's List</option><option value="dean">Dean's List</option><option value="summa">Summa Cum Laude</option><option value="magna">Magna Cum Laude</option><option value="cum">Cum Laude</option></select></label>
   <div id="tOut" style="margin-top:.8rem"></div>
  </div>
+
+ <div class="card" id="coach" style="margin-top:1.3rem;scroll-margin-top:80px">
+  <h3>Academic Coach <span class="muted" style="font-weight:500;font-size:.85rem">(estimate — verify with the university)</span></h3>
+  <p class="muted" style="font-size:.9rem">A plain-language read of your entered records: which subjects pull your GWA up or down, and where your GWA lands if your remaining subjects go a certain way. Everything uses the same formulas as the calculators above; nothing is uploaded.</p>
+  <div class="fgrid">
+   <label>Units still to complete<input id="wUnits" type="number" inputmode="decimal" min="0" step="any" placeholder="e.g. 18"></label>
+   <label>Expected grade in those units<select id="wGrade"><option value="">Select grade</option><option value="1.00">1.00</option><option value="1.25">1.25</option><option value="1.50">1.50</option><option value="1.75">1.75</option><option value="2.00">2.00</option><option value="2.25">2.25</option><option value="2.50">2.50</option><option value="2.75">2.75</option><option value="3.00">3.00</option><option value="4.00">4.00</option><option value="5.00">5.00</option></select></label>
+   <label>Target honor<select id="wTarget"><option value="">Select a target</option><option value="pres">President's List</option><option value="dean">Dean's List</option><option value="summa">Summa Cum Laude</option><option value="magna">Magna Cum Laude</option><option value="cum">Cum Laude</option></select></label>
+  </div>
+  <div id="coachOut" aria-live="polite"></div>
+ </div>
 </div></section>
 
 <!-- GRADES -->
