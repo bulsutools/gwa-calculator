@@ -42,6 +42,9 @@ jobs:
       - name: Check inline JavaScript syntax
         run: pnpm run check:js
 
+      - name: API + formula unit tests
+        run: pnpm run test:api
+
   e2e:
     name: Browser smoke tests
     needs: verify
@@ -67,3 +70,6 @@ jobs:
 
       - name: Browser smoke tests
         run: pnpm test
+
+      - name: Site/API parity tests
+        run: pnpm run test:parity

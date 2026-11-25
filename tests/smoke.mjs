@@ -1,9 +1,10 @@
 // Browser smoke tests. Run: npm test  (needs: npx playwright install chromium)
+// The site uses ES modules, so it must be served over HTTP (file:// is blocked).
 import { chromium } from 'playwright';
-import { pathToFileURL } from 'node:url';
-import { resolve } from 'node:path';
+import { startServer } from '../scripts/serve.mjs';
 
-const URL_ = pathToFileURL(resolve('index.html')).href;
+const { server, url } = await startServer();
+const URL_ = url + 'index.html';
 const failures = [];
 const ok = (cond, msg) => { console.log(`${cond ? 'PASS' : 'FAIL'}  ${msg}`); if (!cond) failures.push(msg); };
 
@@ -182,5 +183,6 @@ for (const w of [360, 390, 768, 1024, 1280, 1920]) {
 }
 
 await browser.close();
+server.close();
 if (failures.length) { console.error(`\n${failures.length} check(s) failed`); process.exit(1); }
 console.log('\nAll smoke checks passed');
