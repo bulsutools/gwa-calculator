@@ -46,6 +46,20 @@ async function fillRows(page, id, rows, sem = false) {
   ok(gwaText.includes('1.44') && gwaText.includes('1.4375'), 'GWA example 17.25/12 shows 1.44 (1.4375)');
   ok(gwaText.includes('12') && gwaText.includes('17.25'), 'total units 12 and weighted grade 17.25 shown');
 
+  // 2b. Coach panel: per-course drag + what-if projection (issue #1)
+  const coach0 = await page.innerText('#coachOut');
+  ok(coach0.includes('Pulling it up') && coach0.includes('1.75'), 'coach lists the 1.75 subject as pulling GWA up');
+  ok(coach0.includes('Pulling it down') && coach0.includes('1.25'), 'coach lists the 1.25 subjects as pulling GWA down');
+  ok(coach0.includes('GWA =') && coach0.includes('units'), 'coach explains the unit-weighted formula');
+  await page.fill('#wUnits', '12');
+  await page.selectOption('#wGrade', '1.00');
+  await page.selectOption('#wTarget', 'dean');
+  const coach1 = await page.innerText('#coachOut');
+  // projected = (17.25 + 1.00*12) / (12 + 12) = 1.21875 -> 1.22
+  ok(coach1.includes('1.22') && coach1.includes('1.2188'), 'coach what-if projects GWA 1.22 (1.2188) for 12 units at 1.00');
+  ok(coach1.includes('Magna Cum Laude') && coach1.includes('Projected GWA in range'), 'projected GWA lands in Magna Cum Laude range');
+  ok(coach1.includes("Dean's List") && coach1.includes('between 0.98 and 2.06'), 'coach shows required grade band for Dean\'s List target');
+
   // 3. Validation: bad units are rejected, not ignored
   await page.click('[data-clear=gwa]');
   await fillRows(page, 'gwaRows', [[0, '1.25']]);
